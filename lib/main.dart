@@ -4,6 +4,7 @@ import 'theme/app_theme.dart';
 
 import 'screens/splash/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/home/nutrition_screen.dart';
 import 'screens/home/workouts_screen.dart';
@@ -26,6 +27,7 @@ class NutriFitApp extends StatelessWidget {
       routes: {
         "/splash": (_) => const SplashScreen(),
         "/login": (_) => const LoginScreen(),
+        "/register": (_) => const RegisterScreen(),
         "/home": (_) => const HomeScreen(),
         "/profile": (_) => const ProfileScreen(),
         "/nutrition": (_) => const NutritionScreen(),

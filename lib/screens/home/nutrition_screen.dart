@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/meal.dart';
+import '../../theme/app_colors.dart';
 
 class NutritionScreen extends StatefulWidget {
   const NutritionScreen({super.key});
@@ -24,21 +25,37 @@ class _NutritionScreenState extends State<NutritionScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Дневник питания"),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black,
       ),
 
       body: ListView.builder(
         itemCount: meals.length,
         itemBuilder: (context, index) {
           final meal = meals[index];
-          return Card(
+          return Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
             child: ListTile(
-              title: Text(meal.name),
-              subtitle: Text("${meal.calories} ккал • ${meal.time}"),
-              trailing: const Icon(Icons.chevron_right),
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.restaurant_menu, color: AppColors.primary),
+              ),
+              title: Text(
+                meal.name,
+                style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                "${meal.calories} ккал • ${meal.time}",
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+              trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
             ),
           );
         },
@@ -46,7 +63,8 @@ class _NutritionScreenState extends State<NutritionScreen> {
 
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddMealDialog(context),
-        child: const Icon(Icons.add),
+        backgroundColor: AppColors.primary,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

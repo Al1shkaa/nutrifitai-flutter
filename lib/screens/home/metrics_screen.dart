@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/demo_metrics.dart';
+import '../../theme/app_colors.dart';
 
 class MetricsScreen extends StatelessWidget {
   const MetricsScreen({super.key});
@@ -9,9 +10,6 @@ class MetricsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Показатели здоровья"),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black,
       ),
 
       body: GridView.builder(
@@ -29,40 +27,37 @@ class MetricsScreen extends StatelessWidget {
 
           return Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.15),
-                  spreadRadius: 2,
-                  blurRadius: 8,
-                )
-              ],
+              borderRadius: BorderRadius.circular(18),
+              color: AppColors.card,
+              border: Border.all(color: AppColors.border),
             ),
-
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(_iconFromString(m.icon), size: 40, color: Colors.blue),
-                  const SizedBox(height: 10),
-
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(_iconFromString(m.icon), size: 28, color: AppColors.primary),
+                  ),
+                  const SizedBox(height: 12),
                   Text(
                     m.title,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   ),
-
-                  const SizedBox(height: 4),
-
+                  const SizedBox(height: 6),
                   Text(
                     m.value,
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   ),
-
+                  const SizedBox(height: 4),
                   Text(
                     m.unit,
-                    style: const TextStyle(color: Colors.grey, fontSize: 13),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),
                 ],
               ),

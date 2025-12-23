@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/workout.dart';
+import '../../theme/app_colors.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -23,22 +24,35 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Тренировки"),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black,
       ),
 
       body: ListView.builder(
         itemCount: workouts.length,
         itemBuilder: (context, index) {
           final w = workouts[index];
-          return Card(
+          return Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
             child: ListTile(
-              leading: const Icon(Icons.fitness_center, size: 32),
-              title: Text(w.type),
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.fitness_center, size: 24, color: AppColors.secondary),
+              ),
+              title: Text(
+                w.type,
+                style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+              ),
               subtitle: Text(
                 "${w.duration} мин • ${w.calories} ккал • ${w.time}",
+                style: const TextStyle(color: AppColors.textSecondary),
               ),
             ),
           );
@@ -47,7 +61,8 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
 
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addWorkoutBottomSheet(context),
-        child: const Icon(Icons.add),
+        backgroundColor: AppColors.primary,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

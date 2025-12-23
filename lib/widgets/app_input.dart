@@ -18,10 +18,8 @@ class AppInput extends StatelessWidget {
       controller: controller,
       obscureText: obscure,
       decoration: InputDecoration(
+        labelText: hint,
         hintText: hint,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
