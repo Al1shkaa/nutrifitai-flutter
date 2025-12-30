@@ -10,6 +10,8 @@ import 'screens/home/nutrition_screen.dart';
 import 'screens/home/workouts_screen.dart';
 import 'screens/home/metrics_screen.dart';
 import 'screens/home/ai_screen.dart';
+import 'screens/home/edit_profile_screen.dart';
+import 'screens/home/smartwatch_screen.dart';
 
 void main() {
   runApp(const NutriFitApp());
@@ -30,10 +32,12 @@ class NutriFitApp extends StatelessWidget {
         "/register": (_) => const RegisterScreen(),
         "/home": (_) => const HomeScreen(),
         "/profile": (_) => const ProfileScreen(),
+        "/edit-profile": (_) => const EditProfileScreen(),
         "/nutrition": (_) => const NutritionScreen(),
         "/workouts": (_) => const WorkoutsScreen(),
         "/metrics": (_) => const MetricsScreen(),
         "/ai": (_) => const AiScreen(),
+        "/smartwatch": (_) => const SmartwatchScreen(),
       },
     );
   }

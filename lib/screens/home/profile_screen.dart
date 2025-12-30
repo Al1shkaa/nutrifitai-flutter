@@ -1,13 +1,60 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../services/storage_service.dart';
+import 'edit_profile_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String _name = "Mukhammedali";
+  String _height = "177";
+  String _weight = "63";
+  String _age = "19";
+  String _activity = "3 тренировки в неделю";
+  String _goal = "Набрать массу до 70 кг";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    final name = await StorageService.getProfileName() ?? "Mukhammedali";
+    final height = await StorageService.getProfileHeight() ?? "177";
+    final weight = await StorageService.getProfileWeight() ?? "63";
+    final age = await StorageService.getProfileAge() ?? "19";
+    final activity = await StorageService.getProfileActivity() ?? "3 тренировки в неделю";
+    final goal = await StorageService.getProfileGoal() ?? "Набрать массу до 70 кг";
+
+    setState(() {
+      _name = name;
+      _height = height;
+      _weight = weight;
+      _age = age;
+      _activity = activity;
+      _goal = goal;
+    });
+  }
 
   void _logout(BuildContext context) async {
     await StorageService.clearToken();
     Navigator.pushReplacementNamed(context, "/login");
+  }
+
+  Future<void> _navigateToEdit() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+    );
+    if (result == true) {
+      _loadProfileData();
+    }
   }
 
   @override
@@ -33,20 +80,18 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: _statPill("177 см", "Рост")),
+                  Expanded(child: _statPill("$_height см", "Рост")),
                   const SizedBox(width: 10),
-                  Expanded(child: _statPill("63 кг", "Вес")),
+                  Expanded(child: _statPill("$_weight кг", "Вес")),
                   const SizedBox(width: 10),
-                  Expanded(child: _statPill("19 лет", "Возраст")),
+                  Expanded(child: _statPill("$_age лет", "Возраст")),
                 ],
               ),
               const SizedBox(height: 18),
-              _infoTile("Цель", "Набрать массу до 70 кг", Icons.flag),
+              _infoTile("Цель", _goal, Icons.flag),
               const SizedBox(height: 12),
-              _infoTile("Активность", "3 тренировки в неделю", Icons.run_circle),
+              _infoTile("Активность", _activity, Icons.run_circle),
               const SizedBox(height: 24),
-              _settingsTile("Тёмная тема", Icons.dark_mode),
-              const SizedBox(height: 12),
               _settingsTile("Язык приложения", Icons.language),
               const SizedBox(height: 30),
               ElevatedButton(
@@ -86,13 +131,13 @@ class ProfileScreen extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  "Mukhammedali",
-                  style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
+                  _name,
+                  style: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
                 ),
-                SizedBox(height: 4),
-                Text(
+                const SizedBox(height: 4),
+                const Text(
                   "Профиль и параметры здоровья",
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
@@ -100,7 +145,7 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: _navigateToEdit,
             icon: const Icon(Icons.edit, color: AppColors.textSecondary),
             tooltip: "Редактировать",
           ),

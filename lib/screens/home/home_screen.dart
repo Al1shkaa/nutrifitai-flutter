@@ -412,6 +412,12 @@ class HomeScreen extends StatelessWidget {
           onTap: () => Navigator.pushNamed(context, "/metrics"),
         ),
         _sectionTile(
+          title: "Смарт-часы",
+          icon: Icons.watch,
+          color: AppColors.secondary,
+          onTap: () => Navigator.pushNamed(context, "/smartwatch"),
+        ),
+        _sectionTile(
           title: "Профиль",
           icon: Icons.person,
           color: AppColors.textSecondary,
