@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/storage_service.dart';
+import '../../api/onboarding_api.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -9,6 +10,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final OnboardingApi _onboardingApi = OnboardingApi();
+
   @override
   void initState() {
     super.initState();
@@ -21,11 +24,29 @@ class _SplashScreenState extends State<SplashScreen> {
     final token = await StorageService.getToken();
 
     if (token != null && token.isNotEmpty) {
-      // токен есть → сразу домой
-      Navigator.pushReplacementNamed(context, "/home");
+      // токен есть → проверяем статус онбординга
+      try {
+        final status = await _onboardingApi.getStatus();
+        final completed = status['completed'] as bool? ?? false;
+
+        if (mounted) {
+          if (completed) {
+            Navigator.pushReplacementNamed(context, "/home");
+          } else {
+            Navigator.pushReplacementNamed(context, "/onboarding");
+          }
+        }
+      } catch (e) {
+        // Если ошибка при проверке статуса, идём на дом по умолчанию
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, "/home");
+        }
+      }
     } else {
       // токена нет → на логин
-      Navigator.pushReplacementNamed(context, "/login");
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, "/login");
+      }
     }
   }
 

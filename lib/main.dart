@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nutrifit_ai_app/screens/home/profile_screen.dart';
+import 'package:nutrifit_ai_app/screens/onboarding/onboarding_screen.dart';
+import 'package:nutrifit_ai_app/screens/auth/profile_setup_screen.dart';
 import 'theme/app_theme.dart';
 
 import 'screens/splash/splash_screen.dart';
@@ -30,14 +32,23 @@ class NutriFitApp extends StatelessWidget {
         "/splash": (_) => const SplashScreen(),
         "/login": (_) => const LoginScreen(),
         "/register": (_) => const RegisterScreen(),
+        "/profile-setup": (_) => const ProfileSetupScreen(),
+        "/onboarding": (_) => const OnboardingScreen(),
         "/home": (_) => const HomeScreen(),
         "/profile": (_) => const ProfileScreen(),
-        "/edit-profile": (_) => const EditProfileScreen(),
         "/nutrition": (_) => const NutritionScreen(),
         "/workouts": (_) => const WorkoutsScreen(),
         "/metrics": (_) => const MetricsScreen(),
         "/ai": (_) => const AiScreen(),
         "/smartwatch": (_) => const SmartwatchScreen(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == "/edit-profile") {
+          return MaterialPageRoute(
+            builder: (context) => const EditProfileScreen(),
+          );
+        }
+        return null;
       },
     );
   }

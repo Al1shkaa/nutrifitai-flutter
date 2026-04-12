@@ -76,4 +76,14 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString("profile_goal");
   }
+
+  static Future<void> saveProfileGender(String gender) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("profile_gender", gender);
+  }
+
+  static Future<String?> getProfileGender() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString("profile_gender");
+  }
 }

@@ -1,35 +1,26 @@
 import 'package:dio/dio.dart';
-
+import '../api/api_client.dart';
 import 'storage_service.dart';
 
 class AiService {
-  static const String _baseUrl =
-      String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:8080');
+  final Dio _dio = ApiClient.dio;
 
-  final Dio _dio;
-
-  AiService({Dio? client})
-      : _dio = client ??
-            Dio(
-              BaseOptions(
-                baseUrl: _baseUrl,
-                connectTimeout: const Duration(seconds: 15),
-                receiveTimeout: const Duration(seconds: 20),
-                headers: {'Content-Type': 'application/json'},
-              ),
-            );
-
-  Future<String> getRecommendation({String? prompt}) async {
+  Future<String> getRecommendation({String? prompt, bool withPersonalData = false}) async {
+    // В зависимости от логики бэкенда, можно отправлять токен всегда,
+    // а withPersonalData будет флагом для использования данных профиля на сервере.
     final token = await StorageService.getToken();
     if (token == null) {
       throw Exception('Токен не найден. Войдите снова.');
     }
 
     try {
+      // ApiClient автоматически добавит токен
       final res = await _dio.post(
-        '/api/ai/recommend',
-        data: prompt == null || prompt.isEmpty ? null : {'prompt': prompt},
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        '/ai/recommend',
+        data: {
+          if (prompt != null && prompt.isNotEmpty) 'prompt': prompt,
+          'withPersonalData': withPersonalData,
+        },
       );
 
       final data = res.data;
@@ -40,7 +31,7 @@ class AiService {
     } on DioException catch (e) {
       final msg = e.response?.data is Map
           ? (e.response?.data['error'] as String? ?? 'Ошибка запроса')
-          : 'Ошибка запроса';
+          : 'Ошибка запроса: ${e.message}';
       throw Exception(msg);
     }
   }
