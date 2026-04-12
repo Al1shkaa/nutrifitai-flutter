@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../api/onboarding_api.dart';
 import '../../widgets/app_button.dart';
-import '../../widgets/app_input.dart';
+import '../../theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +17,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isLoading = false;
   final authService = AuthService();
 
+  @override
+  void initState() {
+    super.initState();
+  }
+
   void login() async {
     setState(() => isLoading = true);
 
@@ -27,12 +33,44 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = false);
 
     if (success) {
-      Navigator.pushReplacementNamed(context, "/home");
+      // После успешного логина, проверяем статус профиля
+      final onboardingStatus = await _checkProfileCompletion();
+      
+      if (mounted) {
+        if (onboardingStatus['completed'] == true) {
+          // Профиль полный - идём на home
+          Navigator.pushReplacementNamed(context, "/home");
+        } else {
+          // Профиль неполный - идём на onboarding
+          Navigator.pushReplacementNamed(context, "/onboarding");
+        }
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Ошибка входа")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Ошибка входа")),
+        );
+      }
     }
+  }
+
+  Future<Map<String, dynamic>> _checkProfileCompletion() async {
+    try {
+      final onboardingApi = OnboardingApi();
+      final status = await onboardingApi.getStatus();
+      print('Profile completion status: $status');
+      return status;
+    } catch (e) {
+      print('Error checking profile: $e');
+      return {'completed': false};
+    }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -61,33 +99,73 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     "Зайди, чтобы получить персональные рекомендации",
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFFB8C0CC)),
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 32),
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF151C2F),
+                      color: AppColors.card,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF24314A)),
+                      border: Border.all(color: AppColors.border),
                     ),
                     child: Column(
                       children: [
-                        AppInput(
+                        TextFormField(
                           controller: emailController,
-                          hint: "Email",
+                          keyboardType: TextInputType.emailAddress,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                          decoration: InputDecoration(
+                            hintText: "Email",
+                            hintStyle: const TextStyle(color: AppColors.textMuted),
+                            filled: true,
+                            fillColor: AppColors.cardDarker,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.primary),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        AppInput(
+                        TextFormField(
                           controller: passwordController,
-                          hint: "Пароль",
-                          obscure: true,
+                          obscureText: true,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                          decoration: InputDecoration(
+                            hintText: "Пароль",
+                            hintStyle: const TextStyle(color: AppColors.textMuted),
+                            filled: true,
+                            fillColor: AppColors.cardDarker,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.primary),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
                         ),
                         const SizedBox(height: 22),
                         AppButton(
@@ -100,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: () {},
                           child: const Text(
                             "Забыли пароль?",
-                            style: TextStyle(color: Color(0xFFB8C0CC)),
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -109,14 +187,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             const Text(
                               "Нет аккаунта? ",
-                              style: TextStyle(color: Color(0xFFB8C0CC)),
+                              style: TextStyle(color: AppColors.textSecondary),
                             ),
                             TextButton(
                               onPressed: () => Navigator.pushReplacementNamed(context, "/register"),
                               child: const Text(
                                 "Зарегистрироваться",
                                 style: TextStyle(
-                                  color: Color(0xFF9B5CFF),
+                                  color: AppColors.primary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -130,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text(
                     "Войдя, ты подтверждаешь согласие с политикой конфиденциальности",
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF7C8598), fontSize: 12),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                   ),
                 ],
               ),

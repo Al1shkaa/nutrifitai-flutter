@@ -16,6 +16,7 @@ class _AiScreenState extends State<AiScreen> {
   final ScrollController scrollController = ScrollController();
   final AiService aiService = AiService();
   bool isSending = false;
+  bool _withPersonalData = false;
 
   Future<void> sendMessage() async {
     final text = controller.text.trim();
@@ -30,7 +31,10 @@ class _AiScreenState extends State<AiScreen> {
     scrollToBottom();
 
     try {
-      final reply = await aiService.getRecommendation(prompt: text);
+      final reply = await aiService.getRecommendation(
+        prompt: text,
+        withPersonalData: _withPersonalData,
+      );
       setState(() {
         messages.add(Message(text: reply, isUser: false));
       });
@@ -47,8 +51,10 @@ class _AiScreenState extends State<AiScreen> {
   void scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (scrollController.hasClients) {
-        scrollController.jumpTo(
+        scrollController.animateTo(
           scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
         );
       }
     });
@@ -104,6 +110,38 @@ class _AiScreenState extends State<AiScreen> {
                     ),
                   );
                 },
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                border: const Border(top: BorderSide(color: AppColors.border)),
+              ),
+              child: Row(
+                children: [
+                  Switch(
+                    value: _withPersonalData,
+                    onChanged: (val) => setState(() => _withPersonalData = val),
+                    activeColor: Colors.green,
+                    activeTrackColor: Colors.green.withOpacity(0.3),
+                    inactiveThumbColor: Colors.red,
+                    inactiveTrackColor: Colors.red.withOpacity(0.3),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _withPersonalData
+                          ? "Учитывать профиль (Рост, вес, цель)"
+                          : "Без данных профиля",
+                      style: TextStyle(
+                        color: _withPersonalData ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             Container(

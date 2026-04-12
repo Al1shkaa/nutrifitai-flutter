@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/app_button.dart';
-import '../../widgets/app_input.dart';
 import '../../theme/app_colors.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -69,29 +68,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => isLoading = true);
 
-    final success = await authService.register({
-      "name": nameController.text.trim(),
-      "email": emailController.text.trim(),
-      "password": passwordController.text.trim(),
-    });
+    try {
+      final success = await authService.register({
+        "name": nameController.text.trim(),
+        "email": emailController.text.trim(),
+        "password": passwordController.text.trim(),
+      });
 
-    setState(() => isLoading = false);
+      setState(() => isLoading = false);
 
-    if (success) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Регистрация успешна! Войдите в аккаунт"),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        Navigator.pushReplacementNamed(context, "/login");
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Регистрация успешна!"),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.pushReplacementNamed(context, "/login");
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Ошибка регистрации. Проверьте данные."),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
-    } else {
+    } catch (e) {
+      setState(() => isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Ошибка регистрации"),
+          SnackBar(
+            content: Text("Ошибка: $e"),
             backgroundColor: AppColors.error,
           ),
         );

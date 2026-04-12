@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../services/storage_service.dart';
+import '../../services/auth_service.dart';
+import '../../utils/value_mappers.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -15,16 +17,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _heightController;
   late TextEditingController _weightController;
   late TextEditingController _ageController;
-  late TextEditingController _activityController;
-  String _selectedGoal = "Набрать массу до 70 кг";
+  String _selectedGoal = "Похудеть";
+  bool _isLoading = true;
+  final _authService = AuthService();
 
   final List<String> _goals = [
-    "Набрать массу до 70 кг",
-    "Похудеть до 60 кг",
-    "Поддержать текущий вес",
-    "Набрать мышечную массу",
-    "Улучшить выносливость",
-    "Снизить процент жира",
+    "Похудеть",
+    "Набрать мышцы",
+    "Улучшить здоровье",
   ];
 
   @override
@@ -34,20 +34,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _loadProfileData() async {
-    final name = await StorageService.getProfileName() ?? "Mukhammedali";
-    final height = await StorageService.getProfileHeight() ?? "177";
-    final weight = await StorageService.getProfileWeight() ?? "63";
-    final age = await StorageService.getProfileAge() ?? "19";
-    final activity = await StorageService.getProfileActivity() ?? "3 тренировки в неделю";
-    final goal = await StorageService.getProfileGoal() ?? "Набрать массу до 70 кг";
+    setState(() => _isLoading = true);
+    
+    // Сначала пытаемся загрузить с бэкенда
+    final profileData = await _authService.getProfile();
+    
+    String name, heightCm, weightKg, age, goal;
+    
+    if (profileData != null) {
+      // Данные получены с бэкенда
+      name = profileData['fullName']?.toString() ?? "";
+      heightCm = profileData['heightCm']?.toString() ?? "";
+      weightKg = profileData['weightKg']?.toString() ?? "";
+      age = profileData['age']?.toString() ?? "";
+      goal = mapGoalFromBackend(profileData['goal']?.toString() ?? "LOSE_WEIGHT");
+    } else {
+      // Если не удалось загрузить с бэкенда, используем локальные данные
+      name = await StorageService.getProfileName() ?? "";
+      heightCm = await StorageService.getProfileHeight() ?? "";
+      weightKg = await StorageService.getProfileWeight() ?? "";
+      age = await StorageService.getProfileAge() ?? "";
+      goal = mapGoalFromBackend(await StorageService.getProfileGoal() ?? "LOSE_WEIGHT");
+    }
 
     setState(() {
       _nameController = TextEditingController(text: name);
-      _heightController = TextEditingController(text: height);
-      _weightController = TextEditingController(text: weight);
+      _heightController = TextEditingController(text: heightCm);
+      _weightController = TextEditingController(text: weightKg);
       _ageController = TextEditingController(text: age);
-      _activityController = TextEditingController(text: activity);
       _selectedGoal = goal;
+      _isLoading = false;
     });
   }
 
@@ -57,33 +73,67 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _heightController.dispose();
     _weightController.dispose();
     _ageController.dispose();
-    _activityController.dispose();
     super.dispose();
   }
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
-      await StorageService.saveProfileName(_nameController.text);
-      await StorageService.saveProfileHeight(_heightController.text);
-      await StorageService.saveProfileWeight(_weightController.text);
-      await StorageService.saveProfileAge(_ageController.text);
-      await StorageService.saveProfileActivity(_activityController.text);
-      await StorageService.saveProfileGoal(_selectedGoal);
+      final weight = double.tryParse(_weightController.text.trim());
+      final height = double.tryParse(_heightController.text.trim());
+      final age = int.tryParse(_ageController.text.trim());
+
+      // Сохраняем на бэкенд
+      final success = await _authService.updateProfile({
+        'name': _nameController.text.trim(),
+        'weight': weight,
+        'height': height,
+        'age': age,
+        'goal': mapGoalToBackend(_selectedGoal),
+      });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Профиль успешно сохранён"),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        Navigator.pop(context, true);
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Профиль успешно сохранён"),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.pop(context, true);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Ошибка при сохранении профиля"),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text("Редактирование профиля"),
+        ),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: AppColors.heroGradient,
+            ),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Редактирование профиля"),
@@ -164,22 +214,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                _buildSectionTitle("Цель и активность"),
+                _buildSectionTitle("Цель"),
                 const SizedBox(height: 12),
                 _buildGoalSelector(),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  controller: _activityController,
-                  label: "Активность",
-                  icon: Icons.run_circle,
-                  hint: "Например: 3 тренировки в неделю",
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Введите уровень активности";
-                    }
-                    return null;
-                  },
-                ),
                 const SizedBox(height: 32),
                 ElevatedButton(
                   onPressed: _saveProfile,

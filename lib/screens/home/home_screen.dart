@@ -1,8 +1,47 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
-class HomeScreen extends StatelessWidget {
+import 'package:nutrifit_ai_app/services/auth_service.dart';
+import 'package:nutrifit_ai_app/services/storage_service.dart';
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String _userName = "пользователь";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    final name = await StorageService.getProfileName();
+    if (name != null && name.isNotEmpty) {
+      setState(() {
+        _userName = name;
+      });
+    }
+
+    // Update from API in background to ensure freshness
+    try {
+      final profile = await AuthService().getProfile();
+      if (profile != null && profile['fullName'] != null) {
+        if (mounted) {
+          setState(() {
+            _userName = profile['fullName'].toString();
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading profile: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,9 +125,9 @@ class HomeScreen extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  "Добро пожаловать, Mukhammedali 👋",
+                  "Добро пожаловать, $_userName 👋",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,

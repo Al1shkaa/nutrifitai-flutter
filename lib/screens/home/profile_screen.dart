@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../services/storage_service.dart';
+import '../../services/auth_service.dart';
+import '../../utils/value_mappers.dart';
 import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -11,12 +13,13 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String _name = "Mukhammedali";
-  String _height = "177";
-  String _weight = "63";
-  String _age = "19";
-  String _activity = "3 тренировки в неделю";
-  String _goal = "Набрать массу до 70 кг";
+  String _name = "";
+  String _heightCm = "";
+  String _weightKg = "";
+  String _age = "";
+  String _goal = "";
+  bool _isLoading = true;
+  final _authService = AuthService();
 
   @override
   void initState() {
@@ -25,21 +28,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfileData() async {
-    final name = await StorageService.getProfileName() ?? "Mukhammedali";
-    final height = await StorageService.getProfileHeight() ?? "177";
-    final weight = await StorageService.getProfileWeight() ?? "63";
-    final age = await StorageService.getProfileAge() ?? "19";
-    final activity = await StorageService.getProfileActivity() ?? "3 тренировки в неделю";
-    final goal = await StorageService.getProfileGoal() ?? "Набрать массу до 70 кг";
-
-    setState(() {
-      _name = name;
-      _height = height;
-      _weight = weight;
-      _age = age;
-      _activity = activity;
-      _goal = goal;
-    });
+    setState(() => _isLoading = true);
+    
+    // Сначала пытаемся загрузить с бэкенда
+    final profileData = await _authService.getProfile();
+    
+    if (profileData != null) {
+      // Данные получены с бэкенда
+      setState(() {
+        _name = profileData['fullName']?.toString() ?? "";
+        _heightCm = profileData['heightCm']?.toString() ?? "";
+        _weightKg = profileData['weightKg']?.toString() ?? "";
+        _age = profileData['age']?.toString() ?? "";
+        _goal = mapGoalFromBackend(profileData['goal']?.toString() ?? "");
+      });
+    }
+    
+    setState(() => _isLoading = false);
   }
 
   void _logout(BuildContext context) async {
@@ -59,6 +64,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text("Профиль"),
+        ),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: AppColors.heroGradient,
+            ),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Профиль"),
@@ -80,19 +105,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: _statPill("$_height см", "Рост")),
+                  Expanded(child: _statPill("$_heightCm см", "Рост")),
                   const SizedBox(width: 10),
-                  Expanded(child: _statPill("$_weight кг", "Вес")),
+                  Expanded(child: _statPill("$_weightKg кг", "Вес")),
                   const SizedBox(width: 10),
                   Expanded(child: _statPill("$_age лет", "Возраст")),
                 ],
               ),
               const SizedBox(height: 18),
               _infoTile("Цель", _goal, Icons.flag),
-              const SizedBox(height: 12),
-              _infoTile("Активность", _activity, Icons.run_circle),
               const SizedBox(height: 24),
-              _settingsTile("Язык приложения", Icons.language),
               const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: () => _logout(context),
@@ -207,22 +229,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _settingsTile(String title, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 28),
-          const SizedBox(width: 16),
-          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18)),
-          const Spacer(),
-          const Icon(Icons.arrow_forward_ios, color: AppColors.textSecondary, size: 16),
-        ],
-      ),
-    );
-  }
+
 }

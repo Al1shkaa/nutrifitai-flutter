@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'api_client.dart';
 import '../models/login_request.dart';
 import '../models/login_response.dart';
