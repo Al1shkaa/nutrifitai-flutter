@@ -11,7 +11,6 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
@@ -51,16 +50,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  String? _validateName(String? value) {
-    if (value == null || value.isEmpty) {
-      return "Введите имя";
-    }
-    if (value.length < 2) {
-      return "Имя должно быть не менее 2 символов";
-    }
-    return null;
-  }
-
   void register() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -69,29 +58,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => isLoading = true);
 
     try {
-      final success = await authService.register({
-        "name": nameController.text.trim(),
-        "email": emailController.text.trim(),
-        "password": passwordController.text.trim(),
-      });
+      final success = await authService.register(
+        emailController.text.trim(),
+        passwordController.text.trim(),
+      );
 
       setState(() => isLoading = false);
 
       if (success) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Регистрация успешна!"),
-              backgroundColor: AppColors.success,
-            ),
+          Navigator.pushReplacementNamed(
+            context,
+            '/verify',
+            arguments: emailController.text.trim(),
           );
-          Navigator.pushReplacementNamed(context, "/login");
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Ошибка регистрации. Проверьте данные."),
+              content: Text("Не удалось зарегистрироваться. Возможно email уже занят."),
               backgroundColor: AppColors.error,
             ),
           );
@@ -112,7 +98,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
@@ -166,31 +151,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       child: Column(
                         children: [
-                          TextFormField(
-                            controller: nameController,
-                            validator: _validateName,
-                            style: const TextStyle(color: AppColors.textPrimary),
-                            decoration: InputDecoration(
-                              hintText: "Имя",
-                              hintStyle: const TextStyle(color: AppColors.textMuted),
-                              filled: true,
-                              fillColor: AppColors.cardDarker,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: AppColors.border),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: AppColors.border),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: AppColors.primary),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
                           TextFormField(
                             controller: emailController,
                             validator: _validateEmail,

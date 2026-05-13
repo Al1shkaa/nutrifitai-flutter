@@ -25,30 +25,40 @@ class _LoginScreenState extends State<LoginScreen> {
   void login() async {
     setState(() => isLoading = true);
 
-    final success = await authService.login(
-      emailController.text.trim(),
-      passwordController.text.trim(),
-    );
+    try {
+      final success = await authService.login(
+        emailController.text.trim(),
+        passwordController.text.trim(),
+      );
 
-    setState(() => isLoading = false);
+      setState(() => isLoading = false);
 
-    if (success) {
-      // После успешного логина, проверяем статус профиля
-      final onboardingStatus = await _checkProfileCompletion();
-      
-      if (mounted) {
-        if (onboardingStatus['completed'] == true) {
-          // Профиль полный - идём на home
-          Navigator.pushReplacementNamed(context, "/home");
-        } else {
-          // Профиль неполный - идём на onboarding
-          Navigator.pushReplacementNamed(context, "/onboarding");
+      if (success) {
+        final onboardingStatus = await _checkProfileCompletion();
+        if (mounted) {
+          if (onboardingStatus['completed'] == true) {
+            Navigator.pushReplacementNamed(context, "/home");
+          } else {
+            Navigator.pushReplacementNamed(context, "/onboarding");
+          }
         }
       }
-    } else {
+    } on VerificationRequiredException catch (e) {
+      setState(() => isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Ошибка входа")),
+          const SnackBar(
+            content: Text("Email не подтверждён. Сейчас отправим код повторно."),
+          ),
+        );
+        authService.resendCode(e.email);
+        Navigator.pushNamed(context, '/verify', arguments: e.email);
+      }
+    } catch (_) {
+      setState(() => isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Ошибка входа. Проверьте данные.")),
         );
       }
     }

@@ -14,6 +14,7 @@ import 'screens/home/metrics_screen.dart';
 import 'screens/home/ai_screen.dart';
 import 'screens/home/edit_profile_screen.dart';
 import 'screens/home/smartwatch_screen.dart';
+import 'screens/auth/verify_screen.dart';
 
 void main() {
   runApp(const NutriFitApp());
@@ -46,6 +47,12 @@ class NutriFitApp extends StatelessWidget {
         if (settings.name == "/edit-profile") {
           return MaterialPageRoute(
             builder: (context) => const EditProfileScreen(),
+          );
+        }
+        if (settings.name == "/verify") {
+          final email = settings.arguments as String;
+          return MaterialPageRoute(
+            builder: (context) => VerifyScreen(email: email),
           );
         }
         return null;

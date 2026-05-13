@@ -1,79 +1,60 @@
 import 'package:dio/dio.dart';
 import 'api_client.dart';
+import '../models/workout.dart';
 
 class WorkoutsApi {
-  /// Get all workouts for the user
-  Future<List<Map<String, dynamic>>> getWorkouts() async {
+  Future<List<Workout>> getWorkouts() async {
     try {
       final response = await ApiClient.dio.get('/workouts');
       if (response.data is List) {
-        return List<Map<String, dynamic>>.from(response.data);
+        return (response.data as List)
+            .map((e) => Workout.fromJson(e as Map<String, dynamic>))
+            .toList();
       }
       return [];
     } on DioException {
-      rethrow;
+      return [];
     }
   }
 
-  /// Add a new workout
-  Future<bool> addWorkout(Map<String, dynamic> workoutData) async {
+  Future<Workout?> addWorkout(Workout workout) async {
     try {
-      print('=== WorkoutsApi.addWorkout ===');
-      print('Workout data: $workoutData');
-      
       final response = await ApiClient.dio.post(
         '/workouts',
-        data: workoutData,
+        data: workout.toJson(),
       );
-      
-      print('Add workout response status: ${response.statusCode}');
-      print('Add workout response: ${response.data}');
-      
-      return response.statusCode == 200 || response.statusCode == 201;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return Workout.fromJson(response.data as Map<String, dynamic>);
+      }
+      return null;
     } on DioException catch (e) {
-      print('DioException in addWorkout: ${e.message}');
-      print('Response: ${e.response?.statusCode} - ${e.response?.data}');
-      return false;
+      print('WorkoutsApi.addWorkout error: ${e.response?.statusCode} ${e.response?.data}');
+      return null;
     }
   }
 
-  /// Update an existing workout
-  Future<bool> updateWorkout(String workoutId, Map<String, dynamic> workoutData) async {
+  Future<Workout?> updateWorkout(int id, Workout workout) async {
     try {
-      print('=== WorkoutsApi.updateWorkout ===');
-      print('Workout ID: $workoutId');
-      print('Workout data: $workoutData');
-      
       final response = await ApiClient.dio.put(
-        '/workouts/$workoutId',
-        data: workoutData,
+        '/workouts/$id',
+        data: workout.toJson(),
       );
-      
-      print('Update workout response status: ${response.statusCode}');
-      print('Update workout response: ${response.data}');
-      
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        return Workout.fromJson(response.data as Map<String, dynamic>);
+      }
+      return null;
     } on DioException catch (e) {
-      print('DioException in updateWorkout: ${e.message}');
-      print('Response: ${e.response?.statusCode} - ${e.response?.data}');
-      return false;
+      print('WorkoutsApi.updateWorkout error: ${e.response?.statusCode} ${e.response?.data}');
+      return null;
     }
   }
 
-  /// Delete a workout
-  Future<bool> deleteWorkout(String workoutId) async {
+  Future<bool> deleteWorkout(int id) async {
     try {
-      print('=== WorkoutsApi.deleteWorkout ===');
-      print('Workout ID: $workoutId');
-      
-      final response = await ApiClient.dio.delete('/workouts/$workoutId');
-      
-      print('Delete workout response status: ${response.statusCode}');
-      
-      return response.statusCode == 200;
+      final response = await ApiClient.dio.delete('/workouts/$id');
+      return response.statusCode == 200 || response.statusCode == 204;
     } on DioException catch (e) {
-      print('DioException in deleteWorkout: ${e.message}');
-      print('Response: ${e.response?.statusCode} - ${e.response?.data}');
+      print('WorkoutsApi.deleteWorkout error: ${e.response?.statusCode} ${e.response?.data}');
       return false;
     }
   }

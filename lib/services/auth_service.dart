@@ -2,39 +2,25 @@ import 'package:dio/dio.dart';
 import '../api/api_client.dart';
 import '../services/storage_service.dart';
 
+class VerificationRequiredException implements Exception {
+  final String email;
+  VerificationRequiredException(this.email);
+  @override
+  String toString() => 'Email not verified: $email';
+}
+
 class AuthService {
-  // Используем общий Dio клиент
   final Dio _dio = ApiClient.dio;
 
-  Future<bool> register(Map<String, dynamic> data) async {
+  Future<bool> register(String email, String password) async {
     try {
-      final payload = {
-        'fullName': data['name'] ?? data['fullName'],
-        'email': data['email'],
-        'password': data['password'],
-        'age': data['age'],
-      };
-
-      // Путь относительно Constants.baseUrl (который уже включает /api)
-      final res = await _dio.post('/auth/register', data: payload);
-      final ok = res.statusCode == 200 || res.statusCode == 201;
-
-      final token = res.data is Map ? res.data['token'] as String? : null;
-      if (token != null) {
-        await StorageService.saveToken(token);
-
-        if (data['name'] != null) {
-          await StorageService.saveProfileName(data['name'].toString());
-        }
-        if (data['age'] != null) {
-          await StorageService.saveProfileAge(data['age'].toString());
-        }
-      }
-
-      return ok;
+      await _dio.post('/auth/register', data: {
+        'email': email,
+        'password': password,
+      });
+      return true;
     } on DioException catch (e) {
-      print('Register error: ${e.message}');
-      print('Register error response: ${e.response?.data}');
+      print('Register error: ${e.response?.data}');
       return false;
     } catch (e) {
       print('Register unexpected error: $e');
@@ -42,29 +28,62 @@ class AuthService {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> verify(String email, String code) async {
     try {
-      final payload = {
+      final res = await _dio.post('/auth/verify', data: {
         'email': email,
-        'password': password,
-      };
-
-      final res = await _dio.post('/auth/login', data: payload);
-      final ok = res.statusCode == 200 || res.statusCode == 201;
-
+        'code': code,
+      });
       final token = res.data is Map ? res.data['token'] as String? : null;
       if (token != null) {
         await StorageService.saveToken(token);
       }
-
-      return ok;
+      return true;
     } on DioException catch (e) {
-      print('Login error: ${e.message}');
-      print('Login error response: ${e.response?.data}');
+      print('Verify error: ${e.response?.data}');
       return false;
     } catch (e) {
-      print('Login unexpected error: $e');
+      print('Verify unexpected error: $e');
       return false;
+    }
+  }
+
+  Future<bool> resendCode(String email) async {
+    try {
+      await _dio.post('/auth/resend-code', data: {'email': email});
+      return true;
+    } on DioException catch (e) {
+      print('ResendCode error: ${e.response?.data}');
+      return false;
+    } catch (e) {
+      print('ResendCode unexpected error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> login(String email, String password) async {
+    try {
+      final res = await _dio.post('/auth/login', data: {
+        'email': email,
+        'password': password,
+      });
+      final token = res.data is Map ? res.data['token'] as String? : null;
+      if (token != null) {
+        await StorageService.saveToken(token);
+      }
+      return true;
+    } on DioException catch (e) {
+      final message = e.response?.data is Map
+          ? (e.response!.data['message'] ?? e.response!.data['error'] ?? '')
+          : '';
+      if (e.response?.statusCode == 400 &&
+          message.toString().toLowerCase().contains('not verified')) {
+        throw VerificationRequiredException(email);
+      }
+      print('Login error: ${e.response?.data}');
+      return false;
+    } catch (e) {
+      rethrow;
     }
   }
 
