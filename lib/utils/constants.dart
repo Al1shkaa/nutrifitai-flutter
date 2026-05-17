@@ -1,5 +1,5 @@
 class Constants {
-  static const String baseUrl = "http://10.0.2.2:8080/api";
+  static const String baseUrl = "http://127.0.0.1:8080/api";
 // Для Android-эмулятора через Spring Boot
 
 // Если будешь тестить на реальном телефоне:

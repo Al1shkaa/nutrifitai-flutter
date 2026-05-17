@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/health_service.dart';
 import '../../theme/app_colors.dart';
 
 class SmartwatchScreen extends StatefulWidget {
@@ -9,81 +10,83 @@ class SmartwatchScreen extends StatefulWidget {
 }
 
 class _SmartwatchScreenState extends State<SmartwatchScreen> {
-  bool _isConnected = false;
-  String? _connectedDevice;
-  bool _isSyncing = false;
+  final _service = HealthService();
 
-  final List<Map<String, dynamic>> _availableDevices = [
-    {
-      'name': 'Apple Watch Series 9',
-      'type': 'Apple Watch',
-      'battery': 85,
-      'isNearby': true,
-    },
-    {
-      'name': 'Samsung Galaxy Watch 6',
-      'type': 'Samsung',
-      'battery': 72,
-      'isNearby': true,
-    },
-    {
-      'name': 'Xiaomi Mi Band 8',
-      'type': 'Xiaomi',
-      'battery': 45,
-      'isNearby': false,
-    },
-  ];
+  int _steps = 0;
+  int? _heartRate;
+  double _calories = 0;
+  double _distanceMeters = 0;
+  bool _isLoading = true;
+  bool _hasPermissions = false;
+  String? _error;
 
-  final Map<String, dynamic> _watchData = {
-    'heartRate': 72,
-    'steps': 8432,
-    'calories': 420,
-    'distance': 6.2,
-    'sleep': 7.5,
-    'activeMinutes': 45,
-    'lastSync': '2 минуты назад',
-  };
+  static const int _stepsGoal = 10000;
 
-  void _toggleConnection() {
-    setState(() {
-      if (_isConnected) {
-        _isConnected = false;
-        _connectedDevice = null;
-      } else {
-        _isConnected = true;
-        _connectedDevice = _availableDevices[0]['name'];
-      }
-    });
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
   }
 
-  Future<void> _syncData() async {
-    setState(() {
-      _isSyncing = true;
-    });
-
-    // Симуляция синхронизации
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() {
-      _isSyncing = false;
-      _watchData['lastSync'] = 'Только что';
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Данные успешно синхронизированы"),
-          backgroundColor: AppColors.success,
-        ),
-      );
+  Future<void> _initialize() async {
+    setState(() => _isLoading = true);
+    await _service.configure();
+    final granted = await _service.requestAndroidPermissions();
+    if (!granted) {
+      setState(() {
+        _error = 'Требуется разрешение на физическую активность';
+        _isLoading = false;
+      });
+      return;
     }
+
+    // Стандартный запрос (работает на Android 14+)
+    var hcGranted = await _service.requestHealthPermissions();
+
+    // Если не сработало — проверим, может разрешения уже даны вручную
+    if (!hcGranted) {
+      hcGranted = await _service.hasPermissions();
+    }
+
+    setState(() => _hasPermissions = hcGranted);
+    if (hcGranted) {
+      await _loadData();
+    }
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final results = await Future.wait([
+        _service.getTodaySteps(),
+        _service.getLatestHeartRate(),
+        _service.getTodayCalories(),
+        _service.getTodayDistance(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _steps = results[0] as int;
+          _heartRate = results[1] as int?;
+          _calories = results[2] as double;
+          _distanceMeters = results[3] as double;
+        });
+      }
+    } catch (e) {
+      print('Health data error: $e');
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _isLoading = true);
+    await _loadData();
+    setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Смарт-часы"),
+        title: const Text('Активность'),
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -93,306 +96,259 @@ class _SmartwatchScreenState extends State<SmartwatchScreen> {
             colors: AppColors.heroGradient,
           ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildConnectionCard(),
-              const SizedBox(height: 20),
-              if (_isConnected) ...[
-                _buildSyncButton(),
-                const SizedBox(height: 20),
-                _buildDataSection(),
-                const SizedBox(height: 20),
-              ],
-              _buildDevicesSection(),
-            ],
-          ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+            : !_hasPermissions
+                ? _buildNoPermissionsView()
+                : RefreshIndicator(
+                    onRefresh: _refresh,
+                    color: AppColors.primary,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildStepsHero(),
+                          const SizedBox(height: 16),
+                          _buildMetricsGrid(),
+                          const SizedBox(height: 16),
+                          _buildSourceCard(),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildNoPermissionsView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Icon(
+                Icons.health_and_safety_outlined,
+                size: 64,
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Нет доступа к Health Connect',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Откройте Health Connect и разрешите доступ для NutriFit AI. После этого вернитесь и нажмите «Проверить доступ».',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _service.openHealthConnectSettings(),
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Открыть Health Connect'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _initialize,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Проверить доступ'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildConnectionCard() {
+  Widget _buildStepsHero() {
+    final progress = (_steps / _stepsGoal).clamp(0.0, 1.0);
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: _isConnected
-              ? [
-                  AppColors.secondary.withOpacity(0.3),
-                  AppColors.secondary.withOpacity(0.1),
-                ]
-              : [
-                  AppColors.card,
-                  AppColors.cardDarker,
-                ],
+          colors: [
+            AppColors.primary.withOpacity(0.3),
+            AppColors.primary.withOpacity(0.1),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: _isConnected ? AppColors.secondary : AppColors.border,
-          width: _isConnected ? 2 : 1,
-        ),
+        border: Border.all(color: AppColors.primary.withOpacity(0.4)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _isConnected
-                      ? AppColors.secondary.withOpacity(0.2)
-                      : AppColors.cardDarker,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  _isConnected ? Icons.watch : Icons.watch_off,
-                  color: _isConnected ? AppColors.secondary : AppColors.textMuted,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _isConnected ? "Подключено" : "Не подключено",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: _isConnected ? AppColors.secondary : AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _isConnected
-                          ? _connectedDevice ?? "Устройство подключено"
-                          : "Подключите смарт-часы для отслеживания",
-                      style: TextStyle(
-                        color: _isConnected ? AppColors.textSecondary : AppColors.textMuted,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: _isConnected,
-                onChanged: (_) => _toggleConnection(),
-                activeColor: AppColors.secondary,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSyncButton() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: AppColors.primaryGradient,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: _isSyncing ? null : _syncData,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_isSyncing)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                else
-                  const Icon(Icons.sync, color: Colors.white, size: 24),
-                const SizedBox(width: 12),
-                Text(
-                  _isSyncing ? "Синхронизация..." : "Синхронизировать данные",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDataSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Данные с часов",
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildDataCard(
-                "Пульс",
-                "${_watchData['heartRate']}",
-                "уд/мин",
-                Icons.favorite,
-                AppColors.error,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildDataCard(
-                "Шаги",
-                "${_watchData['steps']}",
-                "шагов",
-                Icons.directions_walk,
-                AppColors.secondary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildDataCard(
-                "Калории",
-                "${_watchData['calories']}",
-                "ккал",
-                Icons.local_fire_department,
-                AppColors.warning,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildDataCard(
-                "Дистанция",
-                "${_watchData['distance']}",
-                "км",
-                Icons.straighten,
-                AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.primary.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.bedtime, color: AppColors.primary, size: 24),
+                child: const Icon(
+                  Icons.directions_walk,
+                  color: AppColors.primary,
+                  size: 28,
+                ),
               ),
               const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Сон",
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$_steps',
+                    style: const TextStyle(
+                      fontSize: 40,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      height: 1.1,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "${_watchData['sleep']} часов",
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  "Хорошо",
-                  style: TextStyle(
-                    color: AppColors.success,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
                   ),
-                ),
+                  const Text(
+                    'шагов сегодня',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.cardDarker,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.access_time, size: 14, color: AppColors.textMuted),
-              const SizedBox(width: 6),
+              const Spacer(),
               Text(
-                "Последняя синхронизация: ${_watchData['lastSync']}",
+                '${(_steps / _stepsGoal * 100).clamp(0, 100).toStringAsFixed(0)}%',
                 style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 12,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 20),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: AppColors.border,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '0',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              Text(
+                'Цель: ${_stepsGoal.toString()} шагов',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              Text(
+                '$_stepsGoal',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricsGrid() {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.1,
+      children: [
+        _buildMetricCard(
+          title: 'Пульс',
+          value: _heartRate != null ? '$_heartRate' : '—',
+          unit: 'уд/мин',
+          icon: Icons.favorite,
+          color: AppColors.error,
+        ),
+        _buildMetricCard(
+          title: 'Калории',
+          value: _calories.toStringAsFixed(0),
+          unit: 'ккал',
+          icon: Icons.local_fire_department,
+          color: AppColors.warning,
+        ),
+        _buildMetricCard(
+          title: 'Расстояние',
+          value: (_distanceMeters / 1000).toStringAsFixed(2),
+          unit: 'км',
+          icon: Icons.directions_run,
+          color: AppColors.secondary,
+        ),
+        _buildMetricCard(
+          title: 'Активность',
+          value: '—',
+          unit: 'мин',
+          icon: Icons.timer_outlined,
+          color: AppColors.success,
         ),
       ],
     );
   }
 
-  Widget _buildDataCard(String title, String value, String unit, IconData icon, Color color) {
+  Widget _buildMetricCard({
+    required String title,
+    required String value,
+    required String unit,
+    required IconData icon,
+    required Color color,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -411,33 +367,30 @@ class _SmartwatchScreenState extends State<SmartwatchScreen> {
             ),
             child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 12),
+          const Spacer(),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
+              height: 1.1,
             ),
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Text(
-                unit,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
+          const SizedBox(height: 2),
+          Text(
+            unit,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             title,
             style: const TextStyle(
+              fontSize: 12,
               color: AppColors.textMuted,
-              fontSize: 13,
             ),
           ),
         ],
@@ -445,131 +398,54 @@ class _SmartwatchScreenState extends State<SmartwatchScreen> {
     );
   }
 
-  Widget _buildDevicesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Доступные устройства",
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ..._availableDevices.map((device) => _buildDeviceCard(device)),
-      ],
-    );
-  }
-
-  Widget _buildDeviceCard(Map<String, dynamic> device) {
-    final isConnected = _isConnected && _connectedDevice == device['name'];
-    final isNearby = device['isNearby'] as bool;
-
+  Widget _buildSourceCard() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isConnected ? AppColors.secondary.withOpacity(0.1) : AppColors.card,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isConnected ? AppColors.secondary : AppColors.border,
-          width: isConnected ? 2 : 1,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isConnected
-                  ? AppColors.secondary.withOpacity(0.2)
-                  : AppColors.cardDarker,
+              color: AppColors.primary.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              Icons.watch,
-              color: isConnected ? AppColors.secondary : AppColors.textSecondary,
-              size: 24,
+            child: const Icon(
+              Icons.watch_outlined,
+              color: AppColors.primary,
+              size: 22,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
+          const SizedBox(width: 14),
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  device['name'],
+                  'Источник данных',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: isConnected ? AppColors.secondary : AppColors.textPrimary,
+                    fontSize: 12,
+                    color: AppColors.textMuted,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(
-                      isNearby ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-                      size: 14,
-                      color: isNearby ? AppColors.success : AppColors.textMuted,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isNearby ? "Рядом" : "Не в зоне доступа",
-                      style: TextStyle(
-                        color: isNearby ? AppColors.success : AppColors.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(Icons.battery_std, size: 14, color: AppColors.textMuted),
-                    const SizedBox(width: 4),
-                    Text(
-                      "${device['battery']}%",
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                SizedBox(height: 2),
+                Text(
+                  'FAIZ W7 Ultimate через HawoFit + Health Connect',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
-          if (isConnected)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                "Подключено",
-                style: TextStyle(
-                  color: AppColors.secondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            )
-          else if (isNearby)
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _isConnected = true;
-                  _connectedDevice = device['name'];
-                });
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.secondary,
-              ),
-              child: const Text("Подключить"),
-            ),
         ],
       ),
     );
   }
 }
-

@@ -15,35 +15,42 @@ class OnboardingApi {
     }
   }
 
-  /// Update profile field (gender, weight, height, age, goal)
+  /// Update profile field via PATCH /api/profile
   Future<bool> updateField(String fieldName, dynamic value) async {
     try {
       print('=== OnboardingApi.updateField ===');
       print('Field: $fieldName, Value: $value, ValueType: ${value.runtimeType}');
-      
-      final response = await ApiClient.dio.post(
-        '/onboarding/update',
-        data: {
-          'field': fieldName,
-          'value': value,
-        },
+
+      String profileField;
+      switch (fieldName) {
+        case 'gender':
+          profileField = 'gender';
+          break;
+        case 'weight':
+          profileField = 'weightKg';
+          break;
+        case 'height':
+          profileField = 'heightCm';
+          break;
+        case 'age':
+          profileField = 'age';
+          break;
+        case 'goal':
+          profileField = 'goal';
+          break;
+        default:
+          profileField = fieldName;
+      }
+
+      final response = await ApiClient.dio.patch(
+        '/profile',
+        data: {profileField: value},
       );
-      
-      print('Update response status: ${response.statusCode}');
-      print('Update response data: ${response.data}');
-      
-      final success = response.statusCode == 200 || response.statusCode == 201;
-      print('Update field "$fieldName" success: $success');
-      
-      return success;
+
+      print('PATCH /profile response: ${response.statusCode} ${response.data}');
+      return response.statusCode == 200;
     } on DioException catch (e) {
-      print('DioException in updateField ($fieldName): ${e.message}');
-      print('Response status: ${e.response?.statusCode}');
-      print('Response data: ${e.response?.data}');
-      print('Exception type: ${e.type}');
-      return false;
-    } catch (e) {
-      print('Exception in updateField ($fieldName): $e');
+      print('PATCH /profile error: ${e.response?.statusCode} ${e.response?.data}');
       return false;
     }
   }
