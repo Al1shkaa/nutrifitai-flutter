@@ -157,4 +157,37 @@ class HealthService {
     }
     return sum;
   }
+
+  Future<int> getTodaySleep() async {
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(hours: 24));
+    try {
+      final data = await _health.getHealthDataFromTypes(
+        types: [HealthDataType.SLEEP_ASLEEP],
+        startTime: yesterday,
+        endTime: now,
+      );
+      if (data.isEmpty) {
+        final data2 = await _health.getHealthDataFromTypes(
+          types: [HealthDataType.SLEEP_SESSION],
+          startTime: yesterday,
+          endTime: now,
+        );
+        if (data2.isEmpty) return 0;
+        int totalMinutes = 0;
+        for (final d in data2) {
+          totalMinutes += d.dateTo.difference(d.dateFrom).inMinutes;
+        }
+        return totalMinutes;
+      }
+      int totalMinutes = 0;
+      for (final d in data) {
+        totalMinutes += d.dateTo.difference(d.dateFrom).inMinutes;
+      }
+      return totalMinutes;
+    } catch (e) {
+      print('Sleep data error: $e');
+      return 0;
+    }
+  }
 }

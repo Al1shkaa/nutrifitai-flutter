@@ -16,6 +16,7 @@ class _SmartwatchScreenState extends State<SmartwatchScreen> {
   int? _heartRate;
   double _calories = 0;
   double _distanceMeters = 0;
+  int _sleepMinutes = 0;
   bool _isLoading = true;
   bool _hasPermissions = false;
   String? _error;
@@ -62,6 +63,7 @@ class _SmartwatchScreenState extends State<SmartwatchScreen> {
         _service.getLatestHeartRate(),
         _service.getTodayCalories(),
         _service.getTodayDistance(),
+        _service.getTodaySleep(),
       ]);
       if (mounted) {
         setState(() {
@@ -69,6 +71,7 @@ class _SmartwatchScreenState extends State<SmartwatchScreen> {
           _heartRate = results[1] as int?;
           _calories = results[2] as double;
           _distanceMeters = results[3] as double;
+          _sleepMinutes = results[4] as int;
         });
       }
     } catch (e) {
@@ -332,11 +335,11 @@ class _SmartwatchScreenState extends State<SmartwatchScreen> {
           color: AppColors.secondary,
         ),
         _buildMetricCard(
-          title: 'Активность',
-          value: '—',
-          unit: 'мин',
-          icon: Icons.timer_outlined,
-          color: AppColors.success,
+          title: 'Сон',
+          value: _sleepMinutes > 0 ? '${_sleepMinutes ~/ 60}ч ${_sleepMinutes % 60}м' : '—',
+          unit: '',
+          icon: Icons.bedtime,
+          color: AppColors.primary,
         ),
       ],
     );

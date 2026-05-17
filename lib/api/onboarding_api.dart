@@ -23,6 +23,9 @@ class OnboardingApi {
 
       String profileField;
       switch (fieldName) {
+        case 'fullName':
+          profileField = 'fullName';
+          break;
         case 'gender':
           profileField = 'gender';
           break;

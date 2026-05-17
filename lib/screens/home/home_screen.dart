@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../../api/nutrition_api.dart';
+import '../../services/health_service.dart';
+import '../../models/meal.dart';
 
 import 'package:nutrifit_ai_app/services/auth_service.dart';
 import 'package:nutrifit_ai_app/services/storage_service.dart';
@@ -13,11 +17,22 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _userName = "пользователь";
+  int _todayCalories = 0;
+  int _calorieGoal = 2200;
+  int _todaySteps = 0;
+  int? _heartRate;
+  int _sleepMinutes = 0;
+  bool _isLoading = true;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadUserName();
+    _loadDashboardData();
+    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _loadDashboardData();
+    });
   }
 
   Future<void> _loadUserName() async {
@@ -41,6 +56,64 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('Error loading profile: $e');
     }
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      final nutritionApi = NutritionApi();
+      final meals = await nutritionApi.getMeals();
+      final today = DateTime.now();
+      int totalCalories = 0;
+      for (final meal in meals) {
+        if (meal.mealDate.year == today.year &&
+            meal.mealDate.month == today.month &&
+            meal.mealDate.day == today.day) {
+          totalCalories += meal.totalCalories.round();
+        }
+      }
+
+      try {
+        final goals = await nutritionApi.getGoals();
+        if (goals != null && goals['dailyCalories'] != null) {
+          _calorieGoal = (goals['dailyCalories'] as num).round();
+        }
+      } catch (_) {}
+
+      int steps = 0;
+      int? heartRate;
+      int sleepMins = 0;
+      try {
+        final healthService = HealthService();
+        await healthService.configure();
+        final hasPerms = await healthService.hasPermissions();
+        if (hasPerms) {
+          steps = await healthService.getTodaySteps();
+          heartRate = await healthService.getLatestHeartRate();
+          sleepMins = await healthService.getTodaySleep();
+        }
+      } catch (e) {
+        print('Health data on dashboard: $e');
+      }
+
+      if (mounted) {
+        setState(() {
+          _todayCalories = totalCalories;
+          _todaySteps = steps;
+          _heartRate = heartRate;
+          _sleepMinutes = sleepMins;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Dashboard load error: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -159,16 +232,16 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _highlightTile(
             title: "Калории",
-            value: "1450 / 2200",
-            subtitle: "Баланс в норме",
+            value: "$_todayCalories / $_calorieGoal",
+            subtitle: "${(_calorieGoal - _todayCalories).clamp(0, 99999)} ккал осталось",
             icon: Icons.local_fire_department,
             color: AppColors.primary,
           ),
           const SizedBox(width: 12),
           _highlightTile(
             title: "Шаги",
-            value: "6 240",
-            subtitle: "Еще 3.7k до цели",
+            value: "$_todaySteps",
+            subtitle: "${(10000 - _todaySteps).clamp(0, 99999)} до цели",
             icon: Icons.directions_walk,
             color: AppColors.secondary,
           ),
@@ -187,6 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(14),
+        height: 155,
         decoration: BoxDecoration(
           color: AppColors.cardDarker,
           borderRadius: BorderRadius.circular(16),
@@ -217,12 +291,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -260,65 +338,70 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _metricCard("Вода", "1.2 L", Icons.water_drop, 0.6, AppColors.secondary)),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.bedtime, color: AppColors.primary, size: 18),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _sleepMinutes > 0 ? "${_sleepMinutes ~/ 60} ч ${_sleepMinutes % 60} мин" : "— ч",
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text("Сон", style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _metricCard("Сон", "7 ч", Icons.bedtime, 0.7, AppColors.primary)),
-            const SizedBox(width: 12),
-            Expanded(child: _metricCard("Пульс", "68 bpm", Icons.favorite, 0.8, AppColors.warning)),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.favorite, color: AppColors.error, size: 18),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      "${_heartRate ?? '—'} уд/м",
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text("Пульс", style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ],
-    );
-  }
-
-  Widget _metricCard(String name, String value, IconData icon, double progress, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            name,
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: AppColors.cardDarker,
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-              minHeight: 6,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -558,22 +641,24 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Открыть AI ассистента",
-                  style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w700),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  "Персональные рекомендации в один клик",
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-              ],
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "Открыть AI ассистента",
+                    style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    "Персональные рекомендации в один клик",
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                ],
+              ),
             ),
-            CircleAvatar(
+            const CircleAvatar(
               backgroundColor: Colors.white12,
               child: Icon(Icons.bolt, color: Colors.white),
             ),

@@ -193,21 +193,39 @@
   },
   "hotPaths": [
     {
-      "path": "lib/services/health_service.dart",
-      "accessCount": 10,
-      "lastAccessed": 1778937690253,
+      "path": "lib/screens/home/home_screen.dart",
+      "accessCount": 31,
+      "lastAccessed": 1779010449339,
       "type": "file"
     },
     {
-      "path": "android/app/src/main/AndroidManifest.xml",
-      "accessCount": 7,
-      "lastAccessed": 1778937690840,
+      "path": "lib/screens/onboarding/onboarding_screen.dart",
+      "accessCount": 16,
+      "lastAccessed": 1779005113257,
+      "type": "file"
+    },
+    {
+      "path": "lib/services/health_service.dart",
+      "accessCount": 13,
+      "lastAccessed": 1779008255801,
       "type": "file"
     },
     {
       "path": "lib/screens/home/smartwatch_screen.dart",
-      "accessCount": 6,
-      "lastAccessed": 1778935630200,
+      "accessCount": 10,
+      "lastAccessed": 1779008288488,
+      "type": "file"
+    },
+    {
+      "path": "android/app/src/main/AndroidManifest.xml",
+      "accessCount": 9,
+      "lastAccessed": 1779008257266,
+      "type": "file"
+    },
+    {
+      "path": "lib/api/onboarding_api.dart",
+      "accessCount": 4,
+      "lastAccessed": 1779003897446,
       "type": "file"
     },
     {
@@ -217,15 +235,27 @@
       "type": "file"
     },
     {
-      "path": "lib/api/onboarding_api.dart",
-      "accessCount": 2,
-      "lastAccessed": 1779000676210,
+      "path": "lib/screens/home/profile_screen.dart",
+      "accessCount": 3,
+      "lastAccessed": 1779009844610,
       "type": "file"
     },
     {
       "path": "lib/api/api_client.dart",
       "accessCount": 2,
       "lastAccessed": 1779000680592,
+      "type": "file"
+    },
+    {
+      "path": "lib/services/ai_service.dart",
+      "accessCount": 2,
+      "lastAccessed": 1779005118931,
+      "type": "file"
+    },
+    {
+      "path": "lib/api/nutrition_api.dart",
+      "accessCount": 2,
+      "lastAccessed": 1779007248744,
       "type": "file"
     },
     {
@@ -238,6 +268,12 @@
       "path": "lib/utils/value_mappers.dart",
       "accessCount": 1,
       "lastAccessed": 1779000655499,
+      "type": "file"
+    },
+    {
+      "path": "lib/models/meal.dart",
+      "accessCount": 1,
+      "lastAccessed": 1779007226967,
       "type": "file"
     }
   ],

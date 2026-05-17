@@ -15,6 +15,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final OnboardingApi _api = OnboardingApi();
   
   // Form fields
+  final nameController = TextEditingController();
   String? selectedGender;
   final weightController = TextEditingController();
   final heightController = TextEditingController();
@@ -40,8 +41,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (mounted) {
         setState(() {
           progress = (status['progress'] as num?)?.toDouble() ?? 0.0;
-          final nextStep = status['nextStep'] as String? ?? 'GENDER';
-          currentStep = _getStepIndex(nextStep);
+          final completed = status['completed'] as bool? ?? false;
+          if (!completed) {
+            currentStep = 0;
+            progress = 0.0;
+          } else {
+            final nextStep = status['nextStep'] as String? ?? 'GENDER';
+            currentStep = _getStepIndex(nextStep);
+          }
         });
       }
     } catch (e) {
@@ -55,23 +62,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   int _getStepIndex(String step) {
     switch (step) {
+      case 'NAME':
+      case 'name':
+        return 0;
       case 'GENDER':
       case 'gender':
-        return 0;
+        return 1;
       case 'WEIGHT':
       case 'weight':
-        return 1;
+        return 2;
       case 'HEIGHT_CM':
       case 'HEIGHT':
       case 'height_cm':
       case 'height':
-        return 2;
+        return 3;
       case 'AGE':
       case 'age':
-        return 3;
+        return 4;
       case 'GOAL':
       case 'goal':
-        return 4;
+        return 5;
       default:
         return 0;
     }
@@ -80,17 +90,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _getStepName(int step) {
     switch (step) {
       case 0:
-        return 'gender';
+        return 'fullName';
       case 1:
-        return 'weight';
+        return 'gender';
       case 2:
-        return 'height'; // Отправляем как 'height' вместо 'height_cm'
+        return 'weight';
       case 3:
-        return 'age';
+        return 'height';
       case 4:
+        return 'age';
+      case 5:
         return 'goal';
       default:
-        return 'gender';
+        return 'fullName';
     }
   }
 
@@ -99,13 +111,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       String errorMessage = 'Пожалуйста, заполните все поля';
       
       switch (currentStep) {
-        case 1:
-          errorMessage = 'Вес должен быть от 1 до 300 кг';
+        case 0:
+          errorMessage = 'Пожалуйста, введите ваше имя';
           break;
         case 2:
-          errorMessage = 'Рост должен быть от 1 до 250 см';
+          errorMessage = 'Вес должен быть от 1 до 300 кг';
           break;
         case 3:
+          errorMessage = 'Рост должен быть от 1 до 250 см';
+          break;
+        case 4:
           errorMessage = 'Возраст должен быть от 1 до 150 лет';
           break;
       }
@@ -126,24 +141,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       dynamic value;
 
       switch (currentStep) {
-        case 0: // Gender
+        case 0: // Name
+          value = nameController.text.trim();
+          if (value.isEmpty) value = null;
+          break;
+        case 1: // Gender
           value = mapGenderToBackend(selectedGender!);
           print('DEBUG: Gender step - selectedGender: $selectedGender, mapped: $value');
           break;
-        case 1: // Weight
+        case 2: // Weight
           value = double.tryParse(weightController.text.trim());
           print('DEBUG: Weight step - value: $value, type: ${value.runtimeType}');
           break;
-        case 2: // Height
+        case 3: // Height
           value = double.tryParse(heightController.text.trim());
           print('DEBUG: Height step - text: "${heightController.text}", double: $value');
           break;
-        case 3: // Age
+        case 4: // Age
           value = int.tryParse(ageController.text.trim());
           print('DEBUG: Age step - ageController.text: "${ageController.text}"');
           print('DEBUG: Age step - parsed value: $value');
           break;
-        case 4: // Goal
+        case 5: // Goal
           value = mapGoalToBackend(selectedGoal!);
           print('DEBUG: Goal step - selectedGoal: $selectedGoal, mapped: $value');
           break;
@@ -158,7 +177,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       print('DEBUG: updateField called - step: $currentStep, field: $stepName, value: $value, success: $success');
 
       if (success) {
-        if (currentStep < 4) {
+        if (currentStep < 5) {
           setState(() => currentStep++);
           _updateProgress();
         } else {
@@ -219,17 +238,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _validateCurrentStep() {
     switch (currentStep) {
       case 0:
-        return selectedGender != null;
+        return nameController.text.trim().isNotEmpty;
       case 1:
+        return selectedGender != null;
+      case 2:
         final weight = double.tryParse(weightController.text.trim());
         return weight != null && weight > 0 && weight <= 300;
-      case 2:
+      case 3:
         final height = double.tryParse(heightController.text.trim());
         return height != null && height > 0 && height <= 250;
-      case 3:
+      case 4:
         final age = int.tryParse(ageController.text.trim());
         return age != null && age > 0 && age <= 150;
-      case 4:
+      case 5:
         return selectedGoal != null;
       default:
         return false;
@@ -238,12 +259,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _updateProgress() {
     setState(() {
-      progress = (currentStep + 1) / 5.0;
+      progress = (currentStep + 1) / 6.0;
     });
   }
 
   @override
   void dispose() {
+    nameController.dispose();
     weightController.dispose();
     heightController.dispose();
     ageController.dispose();
@@ -285,7 +307,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Шаг ${currentStep + 1} из 5',
+                  'Шаг ${currentStep + 1} из 6',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 14,
@@ -307,7 +329,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 _buildStepContent(),
                 const SizedBox(height: 32),
                 AppButton(
-                  title: currentStep == 4 ? 'Завершить' : 'Далее',
+                  title: currentStep == 5 ? 'Завершить' : 'Далее',
                   onPressed: _nextStep,
                   isLoading: isLoading,
                 ),
@@ -322,18 +344,62 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildStepContent() {
     switch (currentStep) {
       case 0:
-        return _buildGenderStep();
+        return _buildNameStep();
       case 1:
-        return _buildWeightStep();
+        return _buildGenderStep();
       case 2:
-        return _buildHeightStep();
+        return _buildWeightStep();
       case 3:
-        return _buildAgeStep();
+        return _buildHeightStep();
       case 4:
+        return _buildAgeStep();
+      case 5:
         return _buildGoalStep();
       default:
         return Container();
     }
+  }
+
+  Widget _buildNameStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Как тебя зовут?',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextFormField(
+          controller: nameController,
+          keyboardType: TextInputType.name,
+          textCapitalization: TextCapitalization.words,
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            hintText: "Введите ваше имя",
+            hintStyle: const TextStyle(color: AppColors.textMuted),
+            filled: true,
+            fillColor: AppColors.cardDarker,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primary),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildGenderStep() {

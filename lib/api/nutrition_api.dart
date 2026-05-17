@@ -42,4 +42,13 @@ class NutritionApi {
       return false;
     }
   }
+
+  Future<Map<String, dynamic>?> getGoals() async {
+    try {
+      final response = await ApiClient.dio.get('/nutrition/goals');
+      return response.data as Map<String, dynamic>?;
+    } on DioException {
+      return null;
+    }
+  }
 }

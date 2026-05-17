@@ -15,10 +15,15 @@ class AiService {
 
     try {
       // ApiClient автоматически добавит токен
+      String finalPrompt = prompt ?? '';
+      if (!withPersonalData && finalPrompt.isNotEmpty) {
+        finalPrompt = 'Ignore any profile/meal/workout data. Answer only this question directly: $finalPrompt';
+      }
+
       final res = await _dio.post(
         '/ai/recommend',
         data: {
-          if (prompt != null && prompt.isNotEmpty) 'prompt': prompt,
+          'prompt': finalPrompt,
           'withPersonalData': withPersonalData,
         },
       );
