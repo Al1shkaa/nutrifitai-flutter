@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,7 @@ import '../../api/workouts_api.dart';
 import '../../models/workout.dart';
 import '../../theme/app_colors.dart';
 import '../../services/ai_service.dart';
+import '../../services/exercise_db_service.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -152,7 +154,10 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
 
   Future<void> _generatePlan() async {
     if (_selectedDays == null || _selectedFormat == null) return;
-    setState(() => _isGenerating = true);
+    setState(() {
+      _isGenerating = true;
+      _weekPlan = null;
+    });
     try {
       final formatInfo = _formats.firstWhere((f) => f['key'] == _selectedFormat);
       final aiService = AiService();
@@ -166,35 +171,22 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     "day": "Понедельник",
     "title": "Грудь и трицепс",
     "exercises": [
-      {"name": "Жим лёжа", "sets": "4x10", "muscle": "Грудь"},
-      {"name": "Разводка гантелей", "sets": "3x12", "muscle": "Грудь"}
+      {"name": "Жим лёжа", "nameEn": "Barbell Bench Press", "sets": "4x10", "muscle": "Грудь"},
+      {"name": "Разводка гантелей", "nameEn": "Dumbbell Flye", "sets": "3x12", "muscle": "Грудь"}
     ]
   }
 ]
-Каждый день должен содержать 6-8 упражнений для фулл бади и 5-7 для остальных форматов. Дни без тренировок не включай. Только JSON массив, ничего больше.''',
+Каждый день должен содержать 6-8 упражнений для фулл бади и 5-7 для остальных форматов. Дни без тренировок не включай. Для каждого упражнения обязательно укажи поле "nameEn" — каноничное английское название (например: Bench Press, Squat, Deadlift, Pull-Up, Push-Up, Bicep Curl, Lat Pulldown, Overhead Press). Используй стандартные английские названия из бодибилдинга. Только JSON массив, ничего больше.''',
         withPersonalData: true,
       );
       try {
-        String jsonStr = response.trim();
-        if (jsonStr.contains('```')) {
-          final start = jsonStr.indexOf('[');
-          final end = jsonStr.lastIndexOf(']');
-          if (start != -1 && end != -1) {
-            jsonStr = jsonStr.substring(start, end + 1);
-          }
-        }
-        if (!jsonStr.startsWith('[')) {
-          final start = jsonStr.indexOf('[');
-          final end = jsonStr.lastIndexOf(']');
-          if (start != -1 && end != -1) {
-            jsonStr = jsonStr.substring(start, end + 1);
-          }
-        }
+        final String jsonStr = _sanitizeAiJson(response);
         final List<dynamic> parsed = json.decode(jsonStr);
         final plan = parsed.map((day) {
           final exercises = (day['exercises'] as List).map((e) {
             return {
               'name': e['name']?.toString() ?? '',
+              'nameEn': e['nameEn']?.toString() ?? '',
               'sets': e['sets']?.toString() ?? '',
               'muscle': e['muscle']?.toString() ?? '',
               'done': false,
@@ -299,23 +291,16 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
         prompt: '''Дай 4 альтернативных упражнения для "${exercise['name']}" (мышца: ${exercise['muscle']}).
 Ответь СТРОГО JSON без markdown:
 [
-  {"name": "Название", "sets": "${exercise['sets']}"},
-  {"name": "Название2", "sets": "${exercise['sets']}"}
+  {"name": "Название", "nameEn": "Exercise Name", "sets": "${exercise['sets']}", "muscle": "${exercise['muscle']}"},
+  {"name": "Название2", "nameEn": "Exercise Name2", "sets": "${exercise['sets']}", "muscle": "${exercise['muscle']}"}
 ]
-Только JSON массив.''',
+Для каждого упражнения обязательно укажи поле "nameEn" — каноничное английское название (например: Dips, Push-Up, Squat). Только JSON массив.''',
         withPersonalData: false,
       );
 
       if (mounted) Navigator.pop(context);
 
-      String jsonStr = response.trim();
-      if (!jsonStr.startsWith('[')) {
-        final start = jsonStr.indexOf('[');
-        final end = jsonStr.lastIndexOf(']');
-        if (start != -1 && end != -1) jsonStr = jsonStr.substring(start, end + 1);
-      }
-
-      final List<dynamic> alternatives = json.decode(jsonStr);
+      final List<dynamic> alternatives = json.decode(_sanitizeAiJson(response));
 
       if (mounted) {
         showModalBottomSheet(
@@ -366,7 +351,9 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                     setState(() {
                       final ex = exercises[exerciseIndex] as Map;
                       ex['name'] = alt['name']?.toString() ?? '';
+                      ex['nameEn'] = alt['nameEn']?.toString() ?? '';
                       ex['sets'] = alt['sets']?.toString() ?? ex['sets']?.toString() ?? '';
+                      ex['muscle'] = alt['muscle']?.toString() ?? ex['muscle']?.toString() ?? '';
                       ex['done'] = false;
                     });
                     _savePlan();
@@ -1063,6 +1050,26 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                                     '${exercise['sets']} • ${exercise['muscle']}',
                                     style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                                   ),
+                                  const SizedBox(height: 6),
+                                  GestureDetector(
+                                    onTap: () => _showExerciseInfo(exercise),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.play_circle_outline, color: AppColors.primary, size: 14),
+                                          const SizedBox(width: 4),
+                                          Text('Как делать?',
+                                              style: TextStyle(color: AppColors.primary, fontSize: 11)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1138,6 +1145,301 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           );
         }),
       ],
+    );
+  }
+
+  String _sanitizeAiJson(String raw) {
+    var s = raw.trim();
+    s = s.replaceAll(RegExp(r'```json', caseSensitive: false), '');
+    s = s.replaceAll('```', '');
+    s = s.trim();
+    final startMatch = s.indexOf(RegExp(r'[\[{]'));
+    final end = s.lastIndexOf(']') > s.lastIndexOf('}')
+        ? s.lastIndexOf(']')
+        : s.lastIndexOf('}');
+    if (startMatch >= 0 && end > startMatch) {
+      s = s.substring(startMatch, end + 1);
+    }
+    s = s.replaceAllMapped(RegExp(r',(\s*[}\]])'), (m) => m.group(1)!);
+    return s;
+  }
+
+  void _showExerciseInfo(Map<String, dynamic> exercise) async {
+    final nameEn = exercise['nameEn']?.toString()?.isNotEmpty == true
+        ? exercise['nameEn'].toString()
+        : exercise['name']?.toString() ?? '';
+    final dbEntry = await ExerciseDbService.findByName(nameEn);
+    if (!mounted) return;
+    final title = exercise['name']?.toString() ?? '';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        if (dbEntry == null) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(title,
+                  style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              const Text('Демонстрация для этого упражнения не найдена в базе.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ]),
+          );
+        }
+        return _ExerciseInfoSheet(title: title, dbEntry: dbEntry);
+      },
+    );
+  }
+}
+
+class _ExerciseInfoSheet extends StatefulWidget {
+  final String title;
+  final Map<String, dynamic> dbEntry;
+  const _ExerciseInfoSheet({required this.title, required this.dbEntry});
+  @override
+  State<_ExerciseInfoSheet> createState() => _ExerciseInfoSheetState();
+}
+
+class _ExerciseInfoSheetState extends State<_ExerciseInfoSheet> {
+  final PageController _pageCtrl = PageController();
+  Timer? _frameTimer;
+  int _frame = 0;
+  int _loops = 0;
+  bool _animDone = false;
+  static const int _maxLoops = 3;
+  late List<String> _images;
+  late List<String> _enInstructions;
+  List<String>? _ruInstructions;
+  bool _translating = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _images = (widget.dbEntry['images'] as List?)?.cast<String>() ?? [];
+    _enInstructions =
+        (widget.dbEntry['instructions'] as List?)?.cast<String>() ?? [];
+    _startFrameAnimation();
+    _translate();
+  }
+
+  void _startFrameAnimation() {
+    if (_images.length < 2) return;
+    _frameTimer?.cancel();
+    _loops = 0;
+    _animDone = false;
+    _frameTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
+      if (!mounted || !_pageCtrl.hasClients) return;
+      final next = (_frame + 1) % _images.length;
+      if (next == 0) {
+        _loops++;
+        if (_loops >= _maxLoops) {
+          _frameTimer?.cancel();
+          if (mounted) setState(() => _animDone = true);
+          return;
+        }
+      }
+      setState(() => _frame = next);
+      _pageCtrl.animateToPage(next,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut);
+    });
+  }
+
+  Future<void> _translate() async {
+    final key = widget.dbEntry['id']?.toString() ??
+        widget.dbEntry['name']?.toString() ??
+        widget.title;
+    final ru = await ExerciseDbService.translateInstructions(
+        key, _enInstructions);
+    if (!mounted) return;
+    setState(() {
+      _ruInstructions = ru;
+      _translating = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _frameTimer?.cancel();
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final muscles =
+        (widget.dbEntry['primaryMuscles'] as List?)?.cast<String>() ?? [];
+    final steps = _ruInstructions ?? _enInstructions;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      expand: false,
+      builder: (_, scroll) => SingleChildScrollView(
+        controller: scroll,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.title,
+                style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text(widget.dbEntry['name']?.toString() ?? '',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+            const SizedBox(height: 16),
+            if (_images.isNotEmpty)
+              SizedBox(
+                height: 240,
+                child: Stack(
+                  children: [
+                    PageView.builder(
+                      controller: _pageCtrl,
+                      itemCount: _images.length,
+                      onPageChanged: (i) => setState(() => _frame = i),
+                      itemBuilder: (_, i) => Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.network(
+                          ExerciseDbService.imageUrl(_images[i]),
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) =>
+                              Container(color: AppColors.card),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.55),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text('${_frame + 1} / ${_images.length}',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                    if (_animDone && _images.length > 1)
+                      Positioned(
+                        bottom: 10,
+                        right: 10,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() => _animDone = false);
+                            _startFrameAnimation();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.replay,
+                                    color: Colors.white, size: 16),
+                                SizedBox(width: 4),
+                                Text('Повторить',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+            const Text('Техника выполнения:',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            if (_translating)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(children: [
+                  const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.primary)),
+                  const SizedBox(width: 10),
+                  const Text('Перевод...',
+                      style: TextStyle(color: AppColors.textMuted)),
+                ]),
+              )
+            else
+              ...steps.asMap().entries.map((e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                            width: 22,
+                            height: 22,
+                            decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle),
+                            alignment: Alignment.center,
+                            child: Text('${e.key + 1}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700))),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: Text(e.value,
+                                style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
+                                    height: 1.4))),
+                      ],
+                    ),
+                  )),
+            if (muscles.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                  spacing: 6,
+                  children: muscles
+                      .map((m) => Chip(
+                            label: Text(ExerciseDbService.muscleRu(m),
+                                style: const TextStyle(fontSize: 11)),
+                            backgroundColor:
+                                AppColors.primary.withOpacity(0.15),
+                          ))
+                      .toList()),
+            ],
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
     );
   }
 }

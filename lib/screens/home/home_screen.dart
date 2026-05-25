@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../api/nutrition_api.dart';
 import '../../services/health_service.dart';
-import '../../models/meal.dart';
 
 import 'package:nutrifit_ai_app/services/auth_service.dart';
 import 'package:nutrifit_ai_app/services/storage_service.dart';
@@ -526,12 +525,6 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.fitness_center,
           color: AppColors.secondary,
           onTap: () => Navigator.pushNamed(context, "/workouts"),
-        ),
-        _sectionTile(
-          title: "Здоровье",
-          icon: Icons.monitor_heart,
-          color: AppColors.warning,
-          onTap: () => Navigator.pushNamed(context, "/metrics"),
         ),
         _sectionTile(
           title: "Смарт-часы",
